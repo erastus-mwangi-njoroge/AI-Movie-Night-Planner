@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎬 AI Movie Night Planner</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: #0f0f1a;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 0;
+            border-bottom: 1px solid #2a2a3a;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .header h1 { 
+            font-size: 28px; 
+            font-weight: 700; 
+            background: linear-gradient(135deg, #f093fb, #f5576c); 
+            -webkit-background-clip: text; 
+            -webkit-text-fill-color: transparent; 
+        }
+        .header-subtitle { color: #888; font-size: 14px; -webkit-text-fill-color: #888; }
+        
+        /* Search */
+        .search-box {
+            display: flex;
+            gap: 10px;
+            flex: 1;
+            max-width: 500px;
+            min-width: 200px;
+        }
+        .search-box input {
+            flex: 1;
+            padding: 10px 16px;
+            border-radius: 8px;
+            border: 1px solid #2a2a3a;
+            background: #1a1a2a;
+            color: #e0e0e0;
+            font-size: 14px;
+        }
+        .search-box input:focus { outline: none; border-color: #f5576c; }
+        .search-box button {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .search-box button:hover { transform: scale(1.02); }
+        
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            border-bottom: 1px solid #2a2a3a;
+            padding-bottom: 10px;
+        }
+        .tab {
+            padding: 8px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            background: #2a2a3a;
+            color: #888;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .tab.active { background: #f5576c; color: white; }
+        .tab:hover:not(.active) { background: #3a3a4a; }
+        
+        /* Movie Grid */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .movie-card {
+            background: #1a1a2a;
+            border-radius: 12px;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+            border: 1px solid #2a2a3a;
+        }
+        .movie-card:hover { transform: translateY(-4px); box-shadow: 0 8px 30px rgba(245, 87, 108, 0.15); }
+        .movie-card img {
+            width: 100%;
+            aspect-ratio: 2/3;
+            object-fit: cover;
+            background: #2a2a3a;
+        }
+        .movie-card .info { padding: 12px; }
+        .movie-card .title { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+        .movie-card .meta { font-size: 12px; color: #888; display: flex; gap: 10px; flex-wrap: wrap; }
+        .movie-card .rating { color: #f5a623; }
+        
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(8px);
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: #1a1a2a;
+            border-radius: 16px;
+            padding: 30px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 1px solid #2a2a3a;
+        }
+        .modal-close {
+            float: right;
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 28px;
+            cursor: pointer;
+        }
+        .modal-close:hover { color: white; }
+        .modal h2 { font-size: 24px; margin-bottom: 8px; }
+        .modal .overview { color: #aaa; line-height: 1.6; margin: 12px 0; }
+        .modal .details { display: flex; gap: 20px; flex-wrap: wrap; font-size: 14px; color: #888; }
+        
+        /* Recommendation Cards */
+        .rec-card {
+            background: #1a1a2a;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border: 1px solid #2a2a3a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .rec-card .score { color: #f5a623; font-weight: 600; }
+        .rec-card .reasoning { color: #888; font-size: 13px; flex: 1; min-width: 150px; }
+        
+        /* Buttons */
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: #f5576c; color: white; }
+        .btn-primary:hover { background: #d9445a; }
+        .btn-secondary { background: #2a2a3a; color: #e0e0e0; }
+        .btn-secondary:hover { background: #3a3a4a; }
+        .btn-success { background: #34c759; color: white; }
+        .btn-success:hover { background: #2db84d; }
+        
+        .section { margin-top: 30px; }
+        .section h2 { font-size: 20px; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
+        .section h2 .badge { font-size: 12px; background: #2a2a3a; padding: 2px 10px; border-radius: 20px; color: #888; }
+        
+        .empty-state { text-align: center; padding: 40px; color: #888; }
+        
+        @media (max-width: 600px) {
+            .header { flex-direction: column; align-items: stretch; }
+            .search-box { max-width: 100%; }
+            .grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div>
+            <h1>🎬 AI Movie Night Planner</h1>
+            <div class="header-subtitle">Find the perfect movie for your group, powered by AI</div>
+        </div>
+        <div class="search-box">
+            <input type="text" id="search-input" placeholder="Search for movies..." onkeypress="if(event.key==='Enter') searchMovies()">
+            <button onclick="searchMovies()">🔍 Search</button>
+        </div>
+    </div>
+    
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('search', this)">Search</div>
+        <div class="tab" onclick="switchTab('watchlist', this)">Watchlist</div>
+        <div class="tab" onclick="switchTab('recommendations', this)">Recommendations</div>
+        <div class="tab" onclick="switchTab('ratings', this)">Ratings</div>
+        <div class="tab" onclick="switchTab('groups', this)">Groups</div>
+    </div>
+    
+    <!-- Tab: Search -->
+    <div id="tab-search" class="section">
+        <h2>🎥 Movie Results <span class="badge" id="result-count">0 found</span></h2>
+        <div class="grid" id="movie-grid">
+            <div class="empty-state">Search for movies to get started</div>
+        </div>
+    </div>
+    
+    <!-- Tab: Watchlist -->
+    <div id="tab-watchlist" class="section" style="display:none;">
+        <h2>📋 Group Watchlist <span class="badge" id="watchlist-count">0 movies</span></h2>
+        <div id="watchlist-container"><div class="empty-state">Loading watchlist...</div></div>
+    </div>
+    
+    <!-- Tab: Recommendations -->
+    <div id="tab-recommendations" class="section" style="display:none;">
+        <h2>🤖 AI Recommendations <span class="badge">Powered by semantic search</span></h2>
+        <div id="recommendations-container"><div class="empty-state">Loading recommendations...</div></div>
+    </div>
+    
+    <!-- Tab: Ratings -->
+    <div id="tab-ratings" class="section" style="display:none;">
+        <h2>⭐ Group Ratings</h2>
+        <div id="ratings-container"><div class="empty-state">Loading ratings...</div></div>
+    </div>
+    
+    <!-- Tab: Groups -->
+    <div id="tab-groups" class="section" style="display:none;">
+        <h2>👥 My Groups</h2>
+        <div style="margin-bottom: 15px;">
+            <input type="text" id="new-group-input" placeholder="Group name..." style="padding:10px; border-radius:8px; border:1px solid #2a2a3a; background:#1a1a2a; color:#e0e0e0; width:200px;">
+            <button class="btn btn-primary" onclick="createGroup()">Create Group</button>
+        </div>
+        <div id="groups-container"><div class="empty-state">Loading groups...</div></div>
+    </div>
+</div>
+
+<!-- Movie Modal -->
+<div class="modal-overlay" id="movie-modal">
+    <div class="modal">
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+        <div id="modal-content">
+            <h2 id="modal-title">Movie Title</h2>
+            <div class="details">
+                <span id="modal-year">📅 Year</span>
+                <span id="modal-runtime">⏱️ Runtime</span>
+                <span id="modal-rating">⭐ Rating</span>
+                <span id="modal-genres">🎭 Genres</span>
+            </div>
+            <p class="overview" id="modal-overview">Overview</p>
+            <div style="margin-top:15px; display:flex; gap:10px; flex-wrap:wrap;">
+                <button class="btn btn-primary" onclick="addToWatchlist()">➕ Add to Watchlist</button>
+                <button class="btn btn-success" onclick="rateMovie()">⭐ Rate This Movie</button>
+            </div>
+            <div id="modal-providers" style="margin-top:15px; display:none;">
+                <h4 style="margin-bottom:8px;">📺 Where to Watch</h4>
+                <div id="provider-list"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentMovieId = null;
+    let currentGroupId = 1;
+    const defaultEmail = '{{ default_email }}';
+    
+    // ============================================================
+    // Search
+    // ============================================================
+    
+    async function searchMovies() {
+        const query = document.getElementById('search-input').value.trim();
+        if (!query) return;
+        
+        const grid = document.getElementById('movie-grid');
+        grid.innerHTML = '<div class="empty-state">Searching...</div>';
+        
+        try {
+            const resp = await fetch(`/api/search?q=${encodeURIComponent(query)}&limit=20`);
+            const movies = await resp.json();
+            
+            document.getElementById('result-count').textContent = `${movies.length} found`;
+            
+            if (movies.length === 0) {
+                grid.innerHTML = '<div class="empty-state">No movies found. Try a different search.</div>';
+                return;
+            }
+            
+            grid.innerHTML = movies.map(m => `
+                <div class="movie-card" onclick="showMovie(${m.id})">
+                    ${m.poster_url ? `<img src="${m.poster_url}" alt="${m.title}">` : '<div style="width:100%; aspect-ratio:2/3; background:#2a2a3a; display:flex; align-items:center; justify-content:center; color:#666; font-size:14px;">No poster</div>'}
+                    <div class="info">
+                        <div class="title">${m.title}</div>
+                        <div class="meta">
+                            <span>${m.release_date ? m.release_date.split('-')[0] : 'N/A'}</span>
+                            <span class="rating">⭐ ${m.vote_average ? m.vote_average.toFixed(1) : 'N/A'}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            switchTab('search', document.querySelector('.tab.active'));
+        } catch (e) {
+            grid.innerHTML = `<div class="empty-state" style="color:#f5576c;">Error: ${e.message}</div>`;
+        }
+    }
+    
+    // ============================================================
+    // Movie Modal
+    // ============================================================
+    
+    async function showMovie(movieId) {
+        currentMovieId = movieId;
+        
+        try {
+            const resp = await fetch(`/api/movie/${movieId}`);
+            const movie = await resp.json();
+            
+            if (movie.error) { alert(movie.error); return; }
+            
+            document.getElementById('modal-title').textContent = movie.title || 'Unknown';
+            document.getElementById('modal-year').textContent = `📅 ${movie.release_date ? movie.release_date.split('-')[0] : 'N/A'}`;
+            document.getElementById('modal-runtime').textContent = `⏱️ ${movie.runtime || 'N/A'} min`;
+            document.getElementById('modal-rating').textContent = `⭐ ${movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A'}`;
+            document.getElementById('modal-genres').textContent = `🎭 ${movie.genres ? movie.genres.map(g => g.name).join(', ') : 'N/A'}`;
+            document.getElementById('modal-overview').textContent = movie.overview || 'No overview available';
+            
+            // Load providers
+            try {
+                const provResp = await fetch(`/api/movie/${movieId}/providers`);
+                const providers = await provResp.json();
+                
+                const providerList = document.getElementById('provider-list');
+                const usProviders = providers.US || providers.us || {};
+                const allProviders = [...(usProviders.flatrate || []), ...(usProviders.rent || []), ...(usProviders.buy || [])];
+                
+                if (allProviders.length > 0) {
+                    document.getElementById('modal-providers').style.display = 'block';
+                    providerList.innerHTML = allProviders.map(p => 
+                        `<span style="display:inline-block; background:#2a2a3a; padding:4px 12px; border-radius:4px; margin:4px;">${p.provider_name}</span>`
+                    ).join('');
+                } else {
+                    document.getElementById('modal-providers').style.display = 'none';
+                }
+            } catch (e) {
+                document.getElementById('modal-providers').style.display = 'none';
+            }
+            
+            document.getElementById('movie-modal').classList.add('active');
+        } catch (e) {
+            alert(`Error loading movie: ${e.message}`);
+        }
+    }
+    
+    function closeModal() {
+        document.getElementById('movie-modal').classList.remove('active');
+    }
+    
+    document.getElementById('movie-modal').addEventListener('click', function(e) {
+        if (e.target === this) closeModal();
+    });
+    
+    // ============================================================
+    // Watchlist Actions
+    // ============================================================
+    
+    async function addToWatchlist() {
+        if (!currentMovieId) return;
+        
+        try {
+            const resp = await fetch('/api/watchlist', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ group_id: currentGroupId, movie_id: currentMovieId, email: defaultEmail })
+            });
+            const result = await resp.json();
+            
+            if (result.error) {
+                alert(`Error: ${result.error}`);
+            } else {
+                alert(`✅ Added "${result.title || 'Movie'}" to watchlist!`);
+                closeModal();
+            }
+        } catch (e) {
+            alert(`Error: ${e.message}`);
+        }
+    }
+    
+    async function rateMovie() {
+        if (!currentMovieId) return;
+        const rating = prompt('Rate this movie (1-10):');
+        if (rating === null) return;
+        const numRating = parseFloat(rating);
+        if (isNaN(numRating) || numRating < 1 || numRating > 10) {
+            alert('Please enter a rating between 1 and 10');
+            return;
+        }
+        
+        const review = prompt('Add a review (optional):');
+        
+        try {
+            const resp = await fetch('/api/rate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ movie_id: currentMovieId, rating: numRating, review: review || null, email: defaultEmail })
+            });
+            const result = await resp.json();
+            
+            if (result.error) {
+                alert(`Error: ${result.error}`);
+            } else {
+                alert(`✅ Rated "${result.title}" ${result.rating}/10!`);
+                closeModal();
+            }
+        } catch (e) {
+            alert(`Error: ${e.message}`);
+        }
+    }
+    
+    // ============================================================
+    // Tabs
+    // ============================================================
+    
+    function switchTab(tab, el) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        if (el) el.classList.add('active');
+        
+        ['search', 'watchlist', 'recommendations', 'ratings', 'groups'].forEach(t => {
+            document.getElementById(`tab-${t}`).style.display = t === tab ? 'block' : 'none';
+        });
+        
+        if (tab === 'watchlist') loadWatchlist();
+        if (tab === 'recommendations') loadRecommendations();
+        if (tab === 'ratings') loadRatings();
+        if (tab === 'groups') loadGroups();
+    }
+    
+    // ============================================================
+    // Watchlist
+    // ============================================================
+    
+    async function loadWatchlist() {
+        const container = document.getElementById('watchlist-container');
+        container.innerHTML = '<div class="empty-state">Loading...</div>';
+        
+        try {
+            const resp = await fetch(`/api/group/${currentGroupId}/watchlist`);
+            const items = await resp.json();
+            
+            document.getElementById('watchlist-count').textContent = `${items.length} movies`;
+            
+            if (items.length === 0) {
+                container.innerHTML = '<div class="empty-state">No movies in watchlist yet</div>';
+                return;
+            }
+            
+            container.innerHTML = items.map(item => `
+                <div class="rec-card">
+                    <div>
+                        <strong>${item.title}</strong>
+                        <div style="font-size:13px; color:#888;">${item.genre_names ? item.genre_names.join(', ') : ''}</div>
+                    </div>
+                    <div>
+                        <span class="badge" style="background:${item.status === 'watched' ? '#34c759' : '#f5a623'}; color:white; padding:2px 12px; border-radius:20px; font-size:12px;">
+                            ${item.status}
+                        </span>
+                        <span style="font-size:12px; color:#888; margin-left:10px;">Added by ${item.added_by}</span>
+                        <button class="btn btn-secondary" style="margin-left:10px; padding:4px 12px; font-size:11px;" onclick="toggleWatchlistStatus(${item.id}, '${item.status}')">
+                            ${item.status === 'watched' ? '↩️ Reopen' : '✅ Watched'}
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        } catch (e) {
+            container.innerHTML = `<div class="empty-state" style="color:#f5576c;">Error: ${e.message}</div>`;
+        }
+    }
+    
+    async function toggleWatchlistStatus(itemId, currentStatus) {
+        const newStatus = currentStatus === 'watched' ? 'pending' : 'watched';
+        try {
+            await fetch(`/api/watchlist/${itemId}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
+            loadWatchlist();
+        } catch (e) {
+            alert(`Error: ${e.message}`);
+        }
+    }
+    
+    // ============================================================
+    // Recommendations
+    // ============================================================
+    
+    async function loadRecommendations() {
+        const container = document.getElementById('recommendations-container');
+        container.innerHTML = '<div class="empty-state">Generating AI recommendations...</div>';
+        
+        try {
+            const resp = await fetch(`/api/group/${currentGroupId}/recommendations?limit=5`);
+            const data = await resp.json();
+            
+            if (data.error) {
+                container.innerHTML = `<div class="empty-state" style="color:#f5576c;">Error: ${data.error}</div>`;
+                return;
+            }
+            
+            const recs = data.recommendations || [];
+            
+            if (recs.length === 0) {
+                container.innerHTML = '<div class="empty-state">No recommendations available. Add movies to your watchlist first!</div>';
+                return;
+            }
+            
+            container.innerHTML = recs.map((rec, i) => `
+                <div class="rec-card">
+                    <div>
+                        <strong>#${i+1} ${rec.movie.title}</strong>
+                        <div style="font-size:13px; color:#888;">${rec.movie.genre_names ? rec.movie.genre_names.join(', ') : ''}</div>
+                        <div style="font-size:13px; color:#888;">${rec.reasoning || ''}</div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:15px;">
+                        <span class="score">${rec.score ? rec.score.toFixed(1) : 'N/A'}/10</span>
+                        <button class="btn btn-primary" onclick="showMovie(${rec.movie.tmdb_id})">View</button>
+                    </div>
+                </div>
+            `).join('');
+        } catch (e) {
+            container.innerHTML = `<div class="empty-state" style="color:#f5576c;">Error: ${e.message}</div>`;
+        }
+    }
+    
+    // ============================================================
+    // Ratings
+    // ============================================================
+    
+    async function loadRatings() {
+        const container = document.getElementById('ratings-container');
+        container.innerHTML = '<div class="empty-state">Loading...</div>';
+        
+        try {
+            const resp = await fetch(`/api/group/${currentGroupId}/ratings`);
+            const ratings = await resp.json();
+            
+            if (ratings.length === 0) {
+                container.innerHTML = '<div class="empty-state">No ratings yet. Watch a movie and rate it!</div>';
+                return;
+            }
+            
+            container.innerHTML = ratings.map(r => `
+                <div class="rec-card">
+                    <div>
+                        <strong>${r.title}</strong>
+                        <div style="font-size:13px; color:#888;">By ${r.email}</div>
+                        ${r.review ? `<div style="font-size:14px; color:#aaa; margin-top:4px;">"${r.review}"</div>` : ''}
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span style="font-size:24px; font-weight:700; color:#f5a623;">${r.rating}/10</span>
+                        <span style="font-size:12px; color:#888;">${new Date(r.created_at).toLocaleDateString()}</span>
+                    </div>
+                </div>
+            `).join('');
+        } catch (e) {
+            container.innerHTML = `<div class="empty-state" style="color:#f5576c;">Error: ${e.message}</div>`;
+        }
+    }
+    
+    // ============================================================
+    // Groups
+    // ============================================================
+    
+    async function loadGroups() {
+        const container = document.getElementById('groups-container');
+        container.innerHTML = '<div class="empty-state">Loading...</div>';
+        
+        try {
+            const resp = await fetch(`/api/groups?email=${defaultEmail}`);
+            const groups = await resp.json();
+            
+            if (groups.length === 0) {
+                container.innerHTML = '<div class="empty-state">No groups yet. Create one below!</div>';
+                return;
+            }
+            
+            container.innerHTML = groups.map(g => `
+                <div class="rec-card" onclick="selectGroup(${g.id})" style="cursor:pointer; ${g.id === currentGroupId ? 'border-color:#f5576c;' : ''}">
+                    <div>
+                        <strong>${g.name}</strong>
+                        <div style="font-size:13px; color:#888;">${g.member_count || 0} members · ${g.watchlist_count || 0} movies in watchlist</div>
+                    </div>
+                    <div>
+                        <span style="font-size:12px; color:#888;">Created ${new Date(g.created_at).toLocaleDateString()}</span>
+                        ${g.id === currentGroupId ? '<span style="background:#f5576c; padding:2px 12px; border-radius:20px; font-size:12px; margin-left:10px;">Active</span>' : ''}
+                    </div>
+                </div>
+            `).join('');
+        } catch (e) {
+            container.innerHTML = `<div class="empty-state" style="color:#f5576c;">Error: ${e.message}</div>`;
+        }
+    }
+    
+    function selectGroup(groupId) {
+        currentGroupId = groupId;
+        loadGroups();
+        loadWatchlist();
+        loadRecommendations();
+        loadRatings();
+    }
+    
+    async function createGroup() {
+        const input = document.getElementById('new-group-input');
+        const name = input.value.trim();
+        if (!name) { alert('Please enter a group name'); return; }
+        
+        try {
+            const resp = await fetch('/api/group', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, email: defaultEmail })
+            });
+            const result = await resp.json();
+            
+            if (result.error) {
+                alert(`Error: ${result.error}`);
+            } else {
+                input.value = '';
+                currentGroupId = result.id;
+                loadGroups();
+                loadWatchlist();
+                alert(`✅ Created group "${result.name}"!`);
+            }
+        } catch (e) {
+            alert(`Error: ${e.message}`);
+        }
+    }
+    
+    // ============================================================
+    // Keyboard Shortcuts
+    // ============================================================
+    
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeModal();
+        if (e.key === 'Enter' && document.activeElement === document.getElementById('new-group-input')) {
+            createGroup();
+        }
+    });
+    
+    // ============================================================
+    // Initialize
+    // ============================================================
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        loadGroups();
+        // Load popular movies by default
+        document.getElementById('search-input').value = 'popular movies';
+        searchMovies();
+    });
+</script>
+</body>
+</html>
