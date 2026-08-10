@@ -44,16 +44,35 @@ python setup_secrets.py
 
 ### 6. Create Agent
 
+
 #### Create Agent Bricks agent with system prompt and tools from *mcp_server/*
 
 ### Tools
-Tool	Description
-search_movies	Semantic movie search
-get_movie_details	Full movie info
-create_group	Create group
-join_group	Join group
-add_to_watchlist	Add to watchlist
-rate_movie	Rate 1-10
-get_group_recommendations	AI recommendations
-compare_movies	Compare movies
 
+| Tool | Description |
+|------|-------------|
+| `search_movies` | Semantic movie search |
+| `get_movie_details` | Full movie info |
+| `create_group` | Create group |
+| `join_group` | Join group |
+| `add_to_watchlist` | Add to watchlist |
+| `rate_movie` | Rate 1-10 |
+| `get_group_recommendations` | AI recommendations |
+| `compare_movies` | Compare movies |
+
+### Example Queries
+* - "Find a funny sci-fi movie that isn't too violent"*
+* - "What should our group watch this weekend?"*
+* - "Compare these movies for our movie night"*
+* - "Rate The Dark Knight 9/10"*
+### Architecture
+TMDB API → Spark Pipeline → Lakebase + pgvector
+                              ↓
+                        MCP Server (FastMCP)
+                              ↓
+                    Agent Bricks + Dashboard
+
+ 
+### Deployed URLs
+MCP Server:
+Dashboard:
