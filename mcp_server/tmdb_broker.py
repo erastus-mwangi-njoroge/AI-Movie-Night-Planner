@@ -6,7 +6,7 @@ No API key in code - fetched from Databricks secrets.
 import base64
 import os
 import time
-from datetime import datetime
+import json
 import requests
 from databricks.sdk import WorkspaceClient
 
@@ -39,11 +39,7 @@ def _request(endpoint: str, params: dict = None) -> dict:
     params = params or {}
     params["api_key"] = _get_api_key()
     
-    resp = requests.get(
-        f"{_BASE_URL}{endpoint}",
-        params=params,
-        timeout=10
-    )
+    resp = requests.get(f"{_BASE_URL}{endpoint}", params=params, timeout=10)
     resp.raise_for_status()
     return resp.json()
 
@@ -77,7 +73,7 @@ def get_movie_details(movie_id: int) -> dict:
         "imdb_id": details.get("imdb_id"),
         "original_language": details.get("original_language"),
         "genres": details.get("genres", []),
-        "cast": [
+        "movie_cast": [
             {"name": c.get("name"), "character": c.get("character")}
             for c in credits.get("cast", [])[:10]
         ],
@@ -101,8 +97,8 @@ def build_movie_text(movie: dict) -> str:
     if movie.get("genres"):
         names = [g.get("name", "") for g in movie["genres"]]
         parts.append(f"Genres: {', '.join(names)}")
-    if movie.get("cast"):
-        names = [c.get("name", "") for c in movie["cast"][:5]]
+    if movie.get("movie_cast"):
+        names = [c.get("name", "") for c in movie["movie_cast"][:5]]
         parts.append(f"Cast: {', '.join(names)}")
     if movie.get("keywords"):
         parts.append(f"Keywords: {', '.join(movie['keywords'][:10])}")
@@ -113,3 +109,23 @@ def get_genre_list() -> list[dict]:
     """Get all movie genres."""
     data = _request("/genre/movie/list", {"language": "en-US"})
     return data.get("genres", [])
+
+
+def discover_movies(genres: list[int] = None, year: int = None, 
+                    min_vote: float = None, limit: int = 20) -> list[dict]:
+    """Discover movies by criteria."""
+    params = {
+        "include_adult": False,
+        "language": "en-US",
+        "sort_by": "popularity.desc",
+        "page": 1
+    }
+    if genres:
+        params["with_genres"] = ",".join(str(g) for g in genres)
+    if year:
+        params["primary_release_year"] = year
+    if min_vote:
+        params["vote_average.gte"] = min_vote
+    
+    data = _request("/discover/movie", params)
+    return data.get("results", [])[:limit]

@@ -108,7 +108,7 @@ def ensure_tables():
             overview TEXT, tagline TEXT, release_date DATE, runtime INTEGER,
             vote_average FLOAT, vote_count INTEGER, popularity FLOAT,
             poster_path TEXT, backdrop_path TEXT, imdb_id TEXT, original_language TEXT,
-            genres JSONB, cast JSONB, keywords JSONB, providers JSONB,
+            genres JSONB, movie_cast JSONB, keywords JSONB, providers JSONB,
             created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
     """)
@@ -178,7 +178,7 @@ def _get_or_create_movie(tmdb_id: int) -> dict:
         INSERT INTO {MOVIES_TABLE} (
             id, tmdb_id, title, overview, tagline, release_date, runtime,
             vote_average, vote_count, popularity, poster_path, backdrop_path,
-            imdb_id, original_language, genres, cast, keywords, providers
+            imdb_id, original_language, genres, movie_cast, keywords, providers
         )
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (tmdb_id) DO UPDATE SET title = EXCLUDED.title, updated_at = now()
@@ -186,7 +186,7 @@ def _get_or_create_movie(tmdb_id: int) -> dict:
         data["id"], data["tmdb_id"], data["title"], data["overview"], data["tagline"],
         data["release_date"], data["runtime"], data["vote_average"], data["vote_count"],
         data["popularity"], data["poster_path"], data["backdrop_path"], data["imdb_id"],
-        data["original_language"], json.dumps(data["genres"]), json.dumps(data["cast"]),
+        data["original_language"], json.dumps(data["genres"]), json.dumps(data["movie_cast"]),
         json.dumps(data["keywords"]), json.dumps(data["providers"])
     ))
     
@@ -198,14 +198,14 @@ def _compute_embedding(movie_id: int):
     movie = lakebase.run_query(f"SELECT * FROM {MOVIES_TABLE} WHERE id = %s", (movie_id,))[0]
     
     genres = json.loads(movie["genres"]) if isinstance(movie["genres"], str) else movie["genres"]
-    cast = json.loads(movie["cast"]) if isinstance(movie["cast"], str) else movie["cast"]
+    movie_cast = json.loads(movie["movie_cast"]) if isinstance(movie["movie_cast"], str) else movie["movie_cast"]
     keywords = json.loads(movie["keywords"]) if isinstance(movie["keywords"], str) else movie["keywords"]
     
     text_parts = [
         f"Title: {movie['title']}",
         f"Overview: {movie['overview']}",
         f"Genres: {', '.join([g.get('name', '') for g in genres])}",
-        f"Cast: {', '.join([c.get('name', '') for c in cast[:5]])}",
+        f"Cast: {', '.join([c.get('name', '') for c in movie_cast[:5]])}",
         f"Keywords: {', '.join(keywords[:10])}",
     ]
     text = " ".join(text_parts)
@@ -273,17 +273,26 @@ def get_movie_details(movie_id: int) -> dict:
     movie = _get_or_create_movie(movie_id)
     
     genres = json.loads(movie["genres"]) if isinstance(movie["genres"], str) else movie["genres"]
-    cast = json.loads(movie["cast"]) if isinstance(movie["cast"], str) else movie["cast"]
+    movie_cast = json.loads(movie["movie_cast"]) if isinstance(movie["movie_cast"], str) else movie["movie_cast"]
     keywords = json.loads(movie["keywords"]) if isinstance(movie["keywords"], str) else movie["keywords"]
     providers = json.loads(movie["providers"]) if isinstance(movie["providers"], str) else movie["providers"]
     
     return {
-        "id": movie["id"], "tmdb_id": movie["tmdb_id"], "title": movie["title"],
-        "overview": movie["overview"], "tagline": movie["tagline"], "release_date": movie["release_date"],
-        "runtime": movie["runtime"], "vote_average": movie["vote_average"], "vote_count": movie["vote_count"],
+        "id": movie["id"],
+        "tmdb_id": movie["tmdb_id"],
+        "title": movie["title"],
+        "overview": movie["overview"],
+        "tagline": movie["tagline"],
+        "release_date": movie["release_date"],
+        "runtime": movie["runtime"],
+        "vote_average": movie["vote_average"],
+        "vote_count": movie["vote_count"],
         "poster_url": tmdb_broker.get_image_url(movie["poster_path"]),
         "backdrop_url": tmdb_broker.get_image_url(movie["backdrop_path"], "w780"),
-        "genres": genres, "cast": cast[:10], "keywords": keywords, "providers": providers
+        "genres": genres,
+        "movie_cast": movie_cast[:10],
+        "keywords": keywords,
+        "providers": providers
     }
 
 

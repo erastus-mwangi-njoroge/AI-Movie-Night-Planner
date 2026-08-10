@@ -6,6 +6,7 @@ Handles all TMDB API calls with rate limiting.
 import base64
 import os
 import time
+import json
 import requests
 from databricks.sdk import WorkspaceClient
 
@@ -70,7 +71,7 @@ def get_movie_details(movie_id: int) -> dict:
         "imdb_id": details.get("imdb_id"),
         "original_language": details.get("original_language"),
         "genres": details.get("genres", []),
-        "cast": [
+        "movie_cast": [
             {"name": c.get("name"), "character": c.get("character")}
             for c in credits.get("cast", [])[:10]
         ],
@@ -95,7 +96,12 @@ def get_genre_list() -> list[dict]:
 
 def discover_movies(genres: list[int] = None, year: int = None, 
                     min_vote: float = None, limit: int = 20) -> list[dict]:
-    params = {"include_adult": False, "language": "en-US", "sort_by": "popularity.desc", "page": 1}
+    params = {
+        "include_adult": False,
+        "language": "en-US",
+        "sort_by": "popularity.desc",
+        "page": 1
+    }
     if genres:
         params["with_genres"] = ",".join(str(g) for g in genres)
     if year:

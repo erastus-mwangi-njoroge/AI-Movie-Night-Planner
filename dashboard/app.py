@@ -65,7 +65,6 @@ def api_search():
     limit = int(request.args.get("limit", 10))
     results = tmdb_broker.search_movies(query, limit=limit)
     
-    # Add poster URLs
     for r in results:
         r["poster_url"] = tmdb_broker.get_image_url(r.get("poster_path"))
     
@@ -166,15 +165,12 @@ def api_create_group():
     if not name:
         return jsonify({"error": "name is required"}), 400
     
-    # Create user if needed
     lakebase.run_write(f"INSERT INTO {USERS_TABLE} (email, display_name) VALUES (%s, %s) ON CONFLICT DO NOTHING", 
                        (email, email.split('@')[0]))
     
-    # Create group
     lakebase.run_write(f"INSERT INTO {GROUPS_TABLE} (name, created_by) VALUES (%s, %s)", (name, email))
     group = lakebase.run_query(f"SELECT * FROM {GROUPS_TABLE} WHERE id = (SELECT LASTVAL())")[0]
     
-    # Add creator as member
     lakebase.run_write(f"INSERT INTO {GROUP_MEMBERS_TABLE} (group_id, email) VALUES (%s, %s)", (group["id"], email))
     
     return jsonify({"id": group["id"], "name": group["name"], "created_by": group["created_by"]}), 201
@@ -185,12 +181,10 @@ def api_join_group(group_id):
     """Join a group."""
     email = request.json.get("email", DEFAULT_EMAIL)
     
-    # Check if group exists
     group = lakebase.run_query(f"SELECT * FROM {GROUPS_TABLE} WHERE id = %s", (group_id,))
     if not group:
         return jsonify({"error": "Group not found"}), 404
     
-    # Add member
     lakebase.run_write(f"INSERT INTO {GROUP_MEMBERS_TABLE} (group_id, email) VALUES (%s, %s) ON CONFLICT DO NOTHING", 
                        (group_id, email))
     
@@ -233,15 +227,13 @@ def api_add_to_watchlist():
     if not group_id or not movie_id:
         return jsonify({"error": "group_id and movie_id are required"}), 400
     
-    # Check if movie exists in DB
     movie = lakebase.run_query(f"SELECT * FROM {MOVIES_TABLE} WHERE tmdb_id = %s", (movie_id,))
     if not movie:
-        # Fetch from TMDB and insert
         movie_data = tmdb_broker.get_movie_details(movie_id)
         lakebase.run_write(f"""
             INSERT INTO {MOVIES_TABLE} (id, tmdb_id, title, overview, tagline, release_date, runtime,
                 vote_average, vote_count, popularity, poster_path, backdrop_path, imdb_id, 
-                original_language, genres, cast, keywords, providers)
+                original_language, genres, movie_cast, keywords, providers)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (tmdb_id) DO NOTHING
         """, (
@@ -250,12 +242,11 @@ def api_add_to_watchlist():
             movie_data["vote_average"], movie_data["vote_count"], movie_data["popularity"],
             movie_data["poster_path"], movie_data["backdrop_path"], movie_data["imdb_id"],
             movie_data["original_language"], json.dumps(movie_data["genres"]),
-            json.dumps(movie_data["cast"]), json.dumps(movie_data["keywords"]),
-            json.dumps(movie_data["providers"])
+            json.dumps(movie_data["movie_cast"]),
+            json.dumps(movie_data["keywords"]), json.dumps(movie_data["providers"])
         ))
         movie = lakebase.run_query(f"SELECT * FROM {MOVIES_TABLE} WHERE tmdb_id = %s", (movie_id,))
     
-    # Add to watchlist
     lakebase.run_write(f"""
         INSERT INTO {WATCHLIST_TABLE} (group_id, movie_id, added_by, status)
         VALUES (%s, %s, %s, 'pending')
@@ -267,7 +258,7 @@ def api_add_to_watchlist():
 
 @app.route("/api/watchlist/<int:item_id>/status", methods=["PUT"])
 def api_update_watchlist_status(item_id):
-    """Update watchlist item status (watched/skipped)."""
+    """Update watchlist item status."""
     data = request.json
     status = data.get("status")
     
@@ -322,12 +313,10 @@ def api_rate_movie():
     if rating < 1 or rating > 10:
         return jsonify({"error": "Rating must be between 1 and 10"}), 400
     
-    # Get movie
     movie = lakebase.run_query(f"SELECT * FROM {MOVIES_TABLE} WHERE tmdb_id = %s", (movie_id,))
     if not movie:
         return jsonify({"error": "Movie not found"}), 404
     
-    # Save rating
     lakebase.run_write(f"""
         INSERT INTO {RATINGS_TABLE} (email, movie_id, rating, review)
         VALUES (%s, %s, %s, %s)
@@ -339,7 +328,7 @@ def api_rate_movie():
 
 
 # ============================================================
-# Recommendations Endpoint (calls MCP tool via direct DB)
+# Recommendations Endpoint
 # ============================================================
 
 @app.route("/api/group/<int:group_id>/recommendations")
@@ -347,18 +336,15 @@ def api_recommendations(group_id):
     """Get AI recommendations for a group."""
     limit = int(request.args.get("limit", 5))
     
-    # Get group members
     members = lakebase.run_query(f"SELECT email FROM {GROUP_MEMBERS_TABLE} WHERE group_id = %s", (group_id,))
     if not members:
         return jsonify({"error": "Group has no members"})
     
     member_emails = [m["email"] for m in members]
     
-    # Get watched movies
     watched = lakebase.run_query(f"SELECT movie_id FROM {WATCHLIST_TABLE} WHERE group_id = %s AND status = 'watched'", (group_id,))
     watched_ids = [w["movie_id"] for w in watched]
     
-    # Get group ratings
     ratings = lakebase.run_query(f"""
         SELECT movie_id, AVG(rating) as avg_rating
         FROM {RATINGS_TABLE}
@@ -369,7 +355,6 @@ def api_recommendations(group_id):
     
     rated_ids = [r["movie_id"] for r in ratings]
     
-    # Get popular movies from TMDB
     import random
     popular = tmdb_broker.search_movies("popular", limit=limit * 5)
     random.shuffle(popular)
@@ -379,14 +364,13 @@ def api_recommendations(group_id):
         if movie["id"] in watched_ids or movie["id"] in rated_ids:
             continue
         
-        # Get or create movie in DB
         existing = lakebase.run_query(f"SELECT * FROM {MOVIES_TABLE} WHERE tmdb_id = %s", (movie["id"],))
         if not existing:
             movie_data = tmdb_broker.get_movie_details(movie["id"])
             lakebase.run_write(f"""
                 INSERT INTO {MOVIES_TABLE} (id, tmdb_id, title, overview, tagline, release_date, runtime,
                     vote_average, vote_count, popularity, poster_path, backdrop_path, imdb_id, 
-                    original_language, genres, cast, keywords, providers)
+                    original_language, genres, movie_cast, keywords, providers)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (tmdb_id) DO NOTHING
             """, (
@@ -395,15 +379,14 @@ def api_recommendations(group_id):
                 movie_data["vote_average"], movie_data["vote_count"], movie_data["popularity"],
                 movie_data["poster_path"], movie_data["backdrop_path"], movie_data["imdb_id"],
                 movie_data["original_language"], json.dumps(movie_data["genres"]),
-                json.dumps(movie_data["cast"]), json.dumps(movie_data["keywords"]),
-                json.dumps(movie_data["providers"])
+                json.dumps(movie_data["movie_cast"]),
+                json.dumps(movie_data["keywords"]), json.dumps(movie_data["providers"])
             ))
             existing = lakebase.run_query(f"SELECT * FROM {MOVIES_TABLE} WHERE tmdb_id = %s", (movie["id"],))
         
         movie_obj = existing[0]
         genres = json.loads(movie_obj["genres"]) if isinstance(movie_obj["genres"], str) else movie_obj["genres"]
         
-        # Calculate score
         group_avg = next((r["avg_rating"] for r in ratings if r["movie_id"] == movie_obj["id"]), None)
         score = (movie["vote_average"] * 0.6 + (group_avg * 0.4)) if group_avg else movie["vote_average"]
         

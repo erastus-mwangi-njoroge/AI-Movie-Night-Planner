@@ -45,6 +45,8 @@ CREATE INDEX IF NOT EXISTS idx_group_members_email ON group_members (email);
 
 -- ============================================================
 -- Part 5: Movies (from TMDB API)
+-- NOTE: "cast" is a reserved keyword in PostgreSQL, so we use
+-- "movie_cast" instead of "cast" for the column name
 -- ============================================================
 CREATE TABLE IF NOT EXISTS movies (
     id INTEGER PRIMARY KEY,
@@ -62,7 +64,7 @@ CREATE TABLE IF NOT EXISTS movies (
     imdb_id TEXT,
     original_language TEXT,
     genres JSONB,
-    cast JSONB,
+    movie_cast JSONB,        -- Changed from "cast" to "movie_cast"
     keywords JSONB,
     providers JSONB,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -138,7 +140,21 @@ CREATE INDEX IF NOT EXISTS idx_recommendations_group_id ON recommendations (grou
 CREATE INDEX IF NOT EXISTS idx_recommendations_score ON recommendations (score DESC);
 
 -- ============================================================
--- Part 10: Verification
+-- Part 10: User Preferences (for personalization)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS user_preferences (
+    email TEXT PRIMARY KEY REFERENCES users(email) ON DELETE CASCADE,
+    favorite_genres JSONB,
+    favorite_actors JSONB,
+    preferred_runtime_min INTEGER DEFAULT 90,
+    preferred_runtime_max INTEGER DEFAULT 180,
+    max_violence_rating INTEGER DEFAULT 5,
+    min_rating FLOAT DEFAULT 6.0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ============================================================
+-- Part 11: Verification
 -- ============================================================
 SELECT 
     table_name,
@@ -146,5 +162,25 @@ SELECT
     data_type
 FROM information_schema.columns
 WHERE table_name IN ('users', 'groups', 'group_members', 'movies', 
-                     'movie_embeddings', 'ratings', 'watchlist_items', 'recommendations')
+                     'movie_embeddings', 'ratings', 'watchlist_items', 
+                     'recommendations', 'user_preferences')
 ORDER BY table_name, ordinal_position;
+
+-- ============================================================
+-- Part 12: Sample Data (Optional - for testing)
+-- ============================================================
+INSERT INTO users (email, display_name) VALUES 
+    ('alice@example.com', 'Alice'),
+    ('bob@example.com', 'Bob'),
+    ('carol@example.com', 'Carol')
+ON CONFLICT (email) DO NOTHING;
+
+INSERT INTO groups (name, created_by) VALUES 
+    ('Movie Night Crew', 'alice@example.com')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO group_members (group_id, email) VALUES 
+    (1, 'alice@example.com'),
+    (1, 'bob@example.com'),
+    (1, 'carol@example.com')
+ON CONFLICT (group_id, email) DO NOTHING;

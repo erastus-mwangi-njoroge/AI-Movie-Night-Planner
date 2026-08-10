@@ -118,7 +118,7 @@ while len(all_movies) < MOVIES_TO_FETCH and page <= 10:
                 "imdb_id": details.get("imdb_id", ""),
                 "original_language": details.get("original_language", ""),
                 "genres": json.dumps(details.get("genres", [])),
-                "cast": json.dumps(details.get("credits", {}).get("cast", [])[:20]),
+                "movie_cast": json.dumps(details.get("credits", {}).get("cast", [])[:20]),
                 "keywords": json.dumps(details.get("keywords", {}).get("keywords", [])),
                 "providers": json.dumps(details.get("watch/providers", {}).get("results", {})),
             })
@@ -142,10 +142,10 @@ from urllib.parse import urlparse
 parsed = urlparse(LAKEBASE_URL)
 jdbc_url = f"jdbc:postgresql://{parsed.hostname}:{parsed.port or 5432}/{parsed.path.lstrip('/')}?sslmode=require"
 
-# Create DataFrame
+# Create DataFrame with movie_cast instead of cast
 schema = ["id", "tmdb_id", "title", "overview", "tagline", "release_date", "runtime",
           "vote_average", "vote_count", "popularity", "poster_path", "backdrop_path",
-          "imdb_id", "original_language", "genres", "cast", "keywords", "providers"]
+          "imdb_id", "original_language", "genres", "movie_cast", "keywords", "providers"]
 
 df = spark.createDataFrame(all_movies, schema=schema)
 print(f"Created DataFrame with {df.count()} rows")
@@ -206,7 +206,7 @@ movies_df = spark.read.format("jdbc") \
 
 df_emb = movies_df.withColumn(
     "embedding",
-    compute_embeddings_udf(col("title"), col("overview"), col("genres"), col("cast"))
+    compute_embeddings_udf(col("title"), col("overview"), col("genres"), col("movie_cast"))
 )
 
 def array_to_vector(arr):
@@ -264,6 +264,9 @@ try:
     cur = conn.cursor()
     cur.execute(f"SELECT COUNT(*) FROM {EMBEDDINGS_TABLE}")
     print(f"✅ Total embeddings: {cur.fetchone()[0]}")
+    
+    cur.execute(f"SELECT COUNT(*) FROM {MOVIES_TABLE}")
+    print(f"✅ Total movies: {cur.fetchone()[0]}")
 finally:
     cur.close()
     conn.close()
